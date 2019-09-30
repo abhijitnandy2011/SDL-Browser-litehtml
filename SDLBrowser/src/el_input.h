@@ -14,24 +14,17 @@ public:
         SDL_Renderer* renderer, 
         SDLContainer* container,
         HtmlInputType inputType);
-    ~el_input();
+    virtual ~el_input(void);
 
+    virtual int	 line_height() const override;
+    virtual bool is_replaced() const override;
+    virtual void get_content_size(litehtml::size& sz, int max_width) override;
+    virtual litehtml::style_display    get_display() const override;
+    virtual litehtml::element_position get_element_position(litehtml::css_offsets* offsets = 0) const override;
+    virtual int	 render(int x, int y, int max_width, bool second_pass = false) override;
     virtual void draw(litehtml::uint_ptr hdc, int x, int y, const litehtml::position* clip);
-    virtual void parse_styles(bool is_reparse);
+    virtual void parse_styles(bool is_reparse) override;
     virtual void on_click();
-
-    virtual litehtml::style_display		get_display() const override;
-    //virtual litehtml::white_space		get_white_space() const override;
-    virtual litehtml::element_position	get_element_position(litehtml::css_offsets* offsets = 0) const override;
-
-    virtual int					render(int x, int y, int max_width, bool second_pass = false) override;
-
-    //virtual int					render_inline(const element::ptr &container, int max_width) override;
-   // virtual int					place_element(const element::ptr &el, int max_width) override;
-
-
-
-   // virtual void get_content_size(litehtml::size& sz, int max_width);
 
    /* BOOL have_focus()
     {
@@ -67,6 +60,5 @@ public:
 private:
     SDL_Renderer *m_renderer;
     SDLContainer *m_container;
-    int m_width;
     HtmlInputType m_inputType;
 };

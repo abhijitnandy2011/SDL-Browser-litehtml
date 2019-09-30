@@ -29,12 +29,11 @@ el_input::~el_input()
 
 }
 
-/*
 void el_input::get_content_size(litehtml::size& sz, int max_width)
 {
-    sz.width = 100;
+    sz.width = max_width/*100*/;
     sz.height = 20;
-}*/
+}
 
 litehtml::style_display el_input::get_display() const
 {
@@ -48,39 +47,182 @@ litehtml::element_position el_input::get_element_position(litehtml::css_offsets*
 
 void el_input::draw(litehtml::uint_ptr hdc, int x, int y, const litehtml::position* clip)
 {
-    //litehtml::html_tag::draw(hdc, x, y, clip);
-    litehtml::media_query_list::ptr mql = std::make_shared<litehtml::media_query_list>();
-    litehtml::css_selector::ptr sel = std::make_shared<litehtml::css_selector>(mql);
-    
-    /*auto ancestor = litehtml::html_tag::find_ancestor(*sel);
-    auto name = ancestor->get_tagName();
-    auto pos1 = ancestor->get_position();*/
+    litehtml::position pos = m_pos;
+    pos.x += x;
+    pos.y += y;
     
     Uint8 r, g, b, a;
     SDL_GetRenderDrawColor(m_renderer, &r, &g, &b, &a);
 
-    litehtml::position pos = litehtml::element::get_placement();   
     switch (m_inputType) {
     case HtmlInputType::TEXT:
-        rectangleRGBA(m_renderer, x, y, x + m_width, y + 20, 255, 0, 0, 255);
+        rectangleRGBA(m_renderer, pos.x, pos.y, pos.x + pos.width, y + pos.height, 255, 0, 0, 255);
         break;
     case HtmlInputType::BUTTON:
-        rectangleRGBA(m_renderer, x, y, x + m_width, y + 20, 0, 0, 255, 255);
+        rectangleRGBA(m_renderer, pos.x, pos.y, pos.x + pos.width, y + pos.height, 0, 0, 255, 255);
         break;
     }
         
     SDL_SetRenderDrawColor(m_renderer, r, g, b, a);
 }
 
-int	el_input::render(int x, int y, int max_width, bool second_pass)
+int el_input::line_height() const
 {
-    std::cout << "render\n";
-    if (max_width > 0)
-        m_width = max_width;
-    return max_width;
+    return height();
 }
 
+bool el_input::is_replaced() const
+{
+    return true;
+}
 
+int	el_input::render(int x, int y, int max_width, bool second_pass)
+{
+    using namespace litehtml;
+
+    int parent_width = max_width;
+
+    calc_outlines(parent_width);
+
+    m_pos.move_to(x, y);
+
+    document::ptr doc = get_document();
+
+    litehtml::size sz;
+    sz.width = max_width;
+    sz.height = 20;
+    //doc->container()->get_image_size(m_src.c_str(), 0, sz);
+
+    m_pos.width = sz.width;
+    m_pos.height = sz.height;
+
+    if (m_css_height.is_predefined() && m_css_width.is_predefined())
+    {
+        m_pos.height = sz.height;
+        m_pos.width = sz.width;
+
+        // check for max-height
+        if (!m_css_max_width.is_predefined())
+        {
+            int max_width = doc->cvt_units(m_css_max_width, m_font_size, parent_width);
+            if (m_pos.width > max_width)
+            {
+                m_pos.width = max_width;
+            }
+            if (sz.width)
+            {
+                m_pos.height = (int)((float)m_pos.width * (float)sz.height / (float)sz.width);
+            }
+            else
+            {
+                m_pos.height = sz.height;
+            }
+        }
+
+        // check for max-height
+        if (!m_css_max_height.is_predefined())
+        {
+            int max_height = doc->cvt_units(m_css_max_height, m_font_size);
+            if (m_pos.height > max_height)
+            {
+                m_pos.height = max_height;
+            }
+            if (sz.height)
+            {
+                m_pos.width = (int)(m_pos.height * (float)sz.width / (float)sz.height);
+            }
+            else
+            {
+                m_pos.width = sz.width;
+            }
+        }
+    }
+    else if (!m_css_height.is_predefined() && m_css_width.is_predefined())
+    {
+        if (!get_predefined_height(m_pos.height))
+        {
+            m_pos.height = (int)m_css_height.val();
+        }
+
+        // check for max-height
+        if (!m_css_max_height.is_predefined())
+        {
+            int max_height = doc->cvt_units(m_css_max_height, m_font_size);
+            if (m_pos.height > max_height)
+            {
+                m_pos.height = max_height;
+            }
+        }
+
+        if (sz.height)
+        {
+            m_pos.width = (int)(m_pos.height * (float)sz.width / (float)sz.height);
+        }
+        else
+        {
+            m_pos.width = sz.width;
+        }
+    }
+    else if (m_css_height.is_predefined() && !m_css_width.is_predefined())
+    {
+        m_pos.width = (int)m_css_width.calc_percent(parent_width);
+
+        // check for max-width
+        if (!m_css_max_width.is_predefined())
+        {
+            int max_width = doc->cvt_units(m_css_max_width, m_font_size, parent_width);
+            if (m_pos.width > max_width)
+            {
+                m_pos.width = max_width;
+            }
+        }
+
+        if (sz.width)
+        {
+            m_pos.height = (int)((float)m_pos.width * (float)sz.height / (float)sz.width);
+        }
+        else
+        {
+            m_pos.height = sz.height;
+        }
+    }
+    else
+    {
+        m_pos.width = (int)m_css_width.calc_percent(parent_width);
+        m_pos.height = 0;
+        if (!get_predefined_height(m_pos.height))
+        {
+            m_pos.height = (int)m_css_height.val();
+        }
+
+        // check for max-height
+        if (!m_css_max_height.is_predefined())
+        {
+            int max_height = doc->cvt_units(m_css_max_height, m_font_size);
+            if (m_pos.height > max_height)
+            {
+                m_pos.height = max_height;
+            }
+        }
+
+        // check for max-height
+        if (!m_css_max_width.is_predefined())
+        {
+            int max_width = doc->cvt_units(m_css_max_width, m_font_size, parent_width);
+            if (m_pos.width > max_width)
+            {
+                m_pos.width = max_width;
+            }
+        }
+    }
+
+    calc_auto_margins(parent_width);
+
+    m_pos.x += content_margins_left();
+    m_pos.y += content_margins_top();
+
+    return m_pos.width + content_margins_left() + content_margins_right();
+}
 
 void el_input::parse_styles(bool is_reparse)
 {
